@@ -1,9 +1,13 @@
 import json, logging, pathlib
+
 import httpx
+from lxml import etree
 
 
 log = logging.getLogger( __name__ )
 
+
+## constants --------------------------------------------------------
 MODS_URL_PATTERN = 'https://repository.library.brown.edu/storage/{PID}/MODS/'
 
 
@@ -38,6 +42,24 @@ def load_tracker( pid_full_fpath: pathlib.Path ) -> dict:
     return tracker
 
 
+def create_record_info_element() -> etree.Element:
+    """
+    Creates and returns a pre-built <mods:recordInfo> element, like this:
+        <mods:recordInfo>
+            <mods:recordInfoNote type="HallHoagOrgLevelRecord">Organization Record</mods:recordInfoNote>
+        </mods:recordInfo>
+    Builds this separately so it can be re-used for each MODS XML document.
+    """
+    record_info = etree.Element('{http://www.loc.gov/mods/v3}recordInfo')
+    record_info_note = etree.SubElement(
+        record_info,
+        '{http://www.loc.gov/mods/v3}recordInfoNote',
+        attrib={'type': 'HallHoagOrgLevelRecord'}
+    )
+    record_info_note.text = 'Organization Record'
+    return record_info
+
+
 def check_if_pid_was_processed( pid: str, tracker: dict ) -> str:
     """
     Check if pid was processed.
@@ -58,6 +80,26 @@ def get_mods( pid: str ) -> str:
     return mods
 
 
+def update_local_mods_string( original_mods_xml: str, PREBUILT_RECORD_INFO_ELEMENT: etree.Element ) -> str:
+    """
+    Adds the pre-built <mods:recordInfo> element to the mods.
+    Returns formatted XML string.
+    """
+    ## load initial string ------------------------------------------
+    parser = etree.XMLParser( remove_blank_text=True )
+    tree = etree.fromstring(original_mods_xml, parser=parser)
+    ## add pre-built record-info element ----------------------------
+    root: etree.Element = tree
+    root.append(etree.ElementTree(PREBUILT_RECORD_INFO_ELEMENT).getroot())
+    ## convert back to string ---------------------------------------
+    new_mods_xml = etree.tostring( 
+        root, 
+        pretty_print=True, 
+        xml_declaration=False, 
+        encoding='UTF-8' ).decode('utf-8')
+    return new_mods_xml
+
+
 ## manager function -------------------------------------------------
 
 
@@ -71,6 +113,8 @@ def manage_update( pid_full_fpath: pathlib.Path ):
     assert len( pids ) == 97
     ## load tracker -------------------------------------------------
     tracker = load_tracker( pid_full_fpath )
+    ## build the record-info element --------------------------------
+    PREBUILT_RECORD_INFO_ELEMENT: etree.Element = create_record_info_element()
     ## loop over pids -----------------------------------------------
     for pid in pids:
         assert type(pid) == str
@@ -79,9 +123,11 @@ def manage_update( pid_full_fpath: pathlib.Path ):
             continue
         ## get mods -------------------------------------------------
         mods: str = get_mods( pid )
-        ## update mods ----------------------------------------------
-        updated_mods = update_mods( mods )
-        ## save mods ------------------------------------------------
+        ## update xml -----------------------------------------------
+        log.debug( f'initial-mods, ``{mods}``' )
+        updated_mods: str = update_local_mods_string( mods, PREBUILT_RECORD_INFO_ELEMENT )
+        log.debug( f'updated-mods, ``{updated_mods}``' )
+        ## save back to BDR -----------------------------------------
         save_mods( pid, updated_mods )
     pass
 
