@@ -12,6 +12,7 @@ MODS_URL_PATTERN = 'https://repository.library.brown.edu/storage/{PID}/MODS/'
 
 
 ## helper functions -------------------------------------------------
+## (manager function at bottom of file)
 
 
 def load_pids( pid_full_fpath: pathlib.Path ) -> list:
@@ -96,14 +97,30 @@ def get_mods( pid: str ) -> str:
     return mods
 
 
+def check_if_element_exists( pid: str, mods: str, tracker_filepath: pathlib.Path ) -> bool:
+    """
+    Checks if element already exists.
+    Returns boolean.
+    If it does already exist, updates tracker.
+    """
+    if '<mods:recordInfo>' in mods:
+        update_tracker( pid, tracker_filepath, 'already_exists' )
+        return_val = True
+    else:
+        return_val = False
+    log.debug( f'return_val, ``{return_val}``' )
+    return return_val
+
+
 def update_local_mods_string( original_mods_xml: str, PREBUILT_RECORD_INFO_ELEMENT: etree.Element ) -> str:
     """
     Adds the pre-built <mods:recordInfo> element to the mods.
     Returns formatted XML string.
     """
     ## load initial string ------------------------------------------
+    log.debug( f'original-mods, ``{original_mods_xml}``' )
     parser = etree.XMLParser( remove_blank_text=True )
-    tree = etree.fromstring(original_mods_xml, parser=parser)
+    tree = etree.fromstring( original_mods_xml, parser=parser )
     ## add pre-built record-info element ----------------------------
     root: etree.Element = tree
     root.append(etree.ElementTree(PREBUILT_RECORD_INFO_ELEMENT).getroot())
@@ -113,13 +130,14 @@ def update_local_mods_string( original_mods_xml: str, PREBUILT_RECORD_INFO_ELEME
         pretty_print=True, 
         xml_declaration=False, 
         encoding='UTF-8' ).decode('utf-8')
+    log.debug( f'new-mods, ``{new_mods_xml}``' )
     return new_mods_xml
 
 
 ## manager function -------------------------------------------------
 
 
-def manage_update( pid_full_fpath: pathlib.Path ):
+def manage_update( pid_full_fpath: pathlib.Path ) -> None:
     """
     Manages processing of mods-update.
     Called by: cli_start.py
@@ -140,17 +158,13 @@ def manage_update( pid_full_fpath: pathlib.Path ):
         ## get mods -------------------------------------------------
         mods: str = get_mods( pid )
         ## check if element already exists --------------------------
-        if '<mods:recordInfo>' in mods:
-            log.debug( f'pid, ``{pid}``, already has record-info' )
-            update_tracker( pid, tracker_filepath, 'already_exists' )
+        if check_if_element_exists( pid, mods, tracker_filepath ) == True:
             continue
         ## update xml -----------------------------------------------
-        log.debug( f'initial-mods, ``{mods}``' )
         updated_mods: str = update_local_mods_string( mods, PREBUILT_RECORD_INFO_ELEMENT )
-        log.debug( f'updated-mods, ``{updated_mods}``' )
         ## save back to BDR -----------------------------------------
         save_mods( pid, updated_mods )
-    pass
+    return
 
 
 ## helpers ----------------------------------------------------------
