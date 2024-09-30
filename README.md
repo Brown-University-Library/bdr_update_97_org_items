@@ -10,6 +10,20 @@ One-off script to update the MODS of 97 org-items in BDR.
 $ python3 ./cli_start.py --pid_filepath "/path/to/foo.txt"
 ```
 
+---
+
+
+## XML to add
+
+```
+<mods:recordInfo>
+  <mods:recordInfoNote type="HallHoagOrgLevelRecord">Organization Record</mods:recordInfoNote>
+</mods:recordInfo>
+```
+
+---
+
+
 ## Getting the PIDs
 
 ### Determining the PIDS
