@@ -28,18 +28,19 @@ def load_pids( pid_full_fpath: pathlib.Path ) -> list:
     return pids
 
 
-def load_tracker( pid_full_fpath: pathlib.Path ) -> dict:
+def create_tracker( pid_full_fpath: pathlib.Path ) -> pathlib.Path:
     """
-    Load tracker.
+    Creates tracker.
     Assumes tracker is in same directory as pid-file.
+    Returns tracker filepath.
     """
     tracker_full_fpath = pid_full_fpath.parent.joinpath( 'tracker.json' )
-    tracker = {}
     if tracker_full_fpath.exists():
-        with open( tracker_full_fpath, 'r' ) as f:
-            tracker = json.loads( f.read() )
-    log.debug( f'tracker, ```{tracker}```' )
-    return tracker
+        pass
+    else:
+        with open( tracker_full_fpath, 'w' ) as f:
+            f.write( '{}' )
+    return tracker_full_fpath
 
 
 def create_record_info_element() -> etree.Element:
@@ -60,13 +61,28 @@ def create_record_info_element() -> etree.Element:
     return record_info
 
 
-def check_if_pid_was_processed( pid: str, tracker: dict ) -> str:
+def check_if_pid_was_processed( pid: str, tracker_filepath: pathlib.Path ) -> str:
     """
     Check if pid was processed.
     """
-    status = tracker.get( pid, 'not_done' )
+    ## load tracker -------------------------------------------------
+    with open( tracker_filepath, 'r' ) as f:
+        tracker: dict = json.loads( f.read() )
+        status = tracker.get( pid, 'not_done' )
     log.debug( f'pid, ``{pid}``; status, ``{status}``' )
     return status
+
+
+def update_tracker( pid: str, tracker_filepath: pathlib.Path, status: str ) -> None:
+    """
+    Loads, updates, and re-saves tracker.
+    """
+    with open( tracker_filepath, 'w' ) as f:
+        tracker: dict = json.loads( f.read() )
+        tracker[ pid ] = status
+        f.write( json.dumps( tracker, sort_keys=True, indent=2 ) )
+    log.debug( f'updated-tracker for pid, ``{pid}`` with status, ``{status}``' )
+    return
 
 
 def get_mods( pid: str ) -> str:
@@ -112,17 +128,22 @@ def manage_update( pid_full_fpath: pathlib.Path ):
     pids: list = load_pids( pid_full_fpath )
     assert len( pids ) == 97
     ## load tracker -------------------------------------------------
-    tracker = load_tracker( pid_full_fpath )
+    tracker_filepath: pathlib.Path = create_tracker( pid_full_fpath )
     ## build the record-info element --------------------------------
     PREBUILT_RECORD_INFO_ELEMENT: etree.Element = create_record_info_element()
     ## loop over pids -----------------------------------------------
     for pid in pids:
         assert type(pid) == str
         ## check if pid has been processed --------------------------
-        if check_if_pid_was_processed( pid, tracker ) == 'done':
+        if check_if_pid_was_processed( pid, tracker_filepath ) == 'done':
             continue
         ## get mods -------------------------------------------------
         mods: str = get_mods( pid )
+        ## check if element already exists --------------------------
+        if '<mods:recordInfo>' in mods:
+            log.debug( f'pid, ``{pid}``, already has record-info' )
+            update_tracker( pid, tracker_filepath, 'already_exists' )
+            continue
         ## update xml -----------------------------------------------
         log.debug( f'initial-mods, ``{mods}``' )
         updated_mods: str = update_local_mods_string( mods, PREBUILT_RECORD_INFO_ELEMENT )
