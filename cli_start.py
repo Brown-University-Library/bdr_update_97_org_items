@@ -1,11 +1,11 @@
 """
 - Reads command-line argument to file containing list of PIDs to update.
 - Validate that file exists and is readable.
-- Calls manage_update.py
+- Calls update_orgs/manage_update.py
 """
 
 import argparse, logging, os, pathlib
-from update_orgs import manage_update
+from update_org_mods import manage_update
 
 
 ## setup logging ----------------------------------------------------
