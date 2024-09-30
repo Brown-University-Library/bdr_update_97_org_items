@@ -49,13 +49,12 @@ def check_if_pid_was_processed( pid: str, tracker: dict ) -> str:
 
 def get_mods( pid: str ) -> str:
     """
-    Get mods.
+    Get mods using the constant.
     """
-    mods_url = MODS_URL_PATTERN.format( PID=pid )
+    mods_url: str = MODS_URL_PATTERN.format( PID=pid )
     log.debug( f'mods_url, ```{mods_url}```' )
-    mods_utf8 = httpx.get( mods_url )
-    mods = mods_utf8.decode( 'utf-8' )
-    assert type(mods) == str
+    resp: httpx.Response = httpx.get( mods_url )
+    mods: str = resp.content.decode( 'utf-8' )  # explicitly declare utf-8
     return mods
 
 
