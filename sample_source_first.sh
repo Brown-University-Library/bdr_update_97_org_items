@@ -1,6 +1,8 @@
 #!/bin/bash
 
-## USAGE: run this script from the outer "stuff" directory
+##  USAGE: 
+##  run this script from the outer "stuff" directory, like:
+##  $ source ./source_first.sh
 
 
 ## check current directory -----------------------------------------------
