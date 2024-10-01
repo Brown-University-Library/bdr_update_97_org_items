@@ -144,7 +144,7 @@ def manage_update( pid_full_fpath: pathlib.Path ) -> None:
     """
     ## get list of pids from file -----------------------------------
     pids: list = load_pids( pid_full_fpath )
-    assert len( pids ) == 97
+    # assert len( pids ) == 97
     ## load tracker -------------------------------------------------
     tracker_filepath: pathlib.Path = create_tracker( pid_full_fpath )
     ## build the record-info element --------------------------------

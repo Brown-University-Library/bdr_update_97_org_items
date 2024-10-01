@@ -13,7 +13,10 @@ Under-construction... next...
 ## Usage
 
 ```
-$ python3 ./cli_start.py --pid_filepath "/path/to/pids.txt"
+$ cd /to/stuff/
+$ source ./source_first.sh
+$ (venv) cd ./bdr_update_97_org_items/
+$ (venv) python3 ./cli_start.py --pid_filepath "/path/to/pids.txt"
 ```
 
 ---
