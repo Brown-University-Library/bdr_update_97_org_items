@@ -1,4 +1,4 @@
-import json, logging, pathlib
+import json, logging, os, pathlib
 
 import httpx
 from lxml import etree
@@ -8,7 +8,7 @@ log = logging.getLogger( __name__ )
 
 
 ## constants --------------------------------------------------------
-MODS_URL_PATTERN = 'https://repository.library.brown.edu/storage/{PID}/MODS/'
+MODS_URL_PATTERN = os.environ['U97__MODS_URL_PATTERN']
 
 
 ## helper functions -------------------------------------------------
