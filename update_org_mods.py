@@ -44,7 +44,7 @@ def create_tracker( pid_full_fpath: pathlib.Path ) -> pathlib.Path:
     return tracker_full_fpath
 
 
-def create_record_info_element() -> etree.Element:
+def create_record_info_element() -> etree.Element:  # type:ignore
     """
     Creates and returns a pre-built <mods:recordInfo> element, like this:
         <mods:recordInfo>
@@ -52,13 +52,16 @@ def create_record_info_element() -> etree.Element:
         </mods:recordInfo>
     Builds this separately so it can be re-used for each MODS XML document.
     """
-    record_info = etree.Element('{http://www.loc.gov/mods/v3}recordInfo')
+    record_info = etree.Element( '{http://www.loc.gov/mods/v3}recordInfo', attrib=None, nsmap=None )
     record_info_note = etree.SubElement(
         record_info,
         '{http://www.loc.gov/mods/v3}recordInfoNote',
-        attrib={'type': 'HallHoagOrgLevelRecord'}
+        attrib={'type': 'HallHoagOrgLevelRecord'},
+        nsmap=None
     )
     record_info_note.text = 'Organization Record'
+    assert type(record_info) == etree._Element
+    log.debug( f' type(record_info), ``{type(record_info)}``; record_info, ``{etree.tostring(record_info).decode("utf-8")}``' )
     return record_info
 
 
@@ -112,7 +115,7 @@ def check_if_element_exists( pid: str, mods: str, tracker_filepath: pathlib.Path
     return return_val
 
 
-def update_local_mods_string( original_mods_xml: str, PREBUILT_RECORD_INFO_ELEMENT: etree.Element ) -> str:
+def update_local_mods_string( original_mods_xml: str, PREBUILT_RECORD_INFO_ELEMENT: etree.Element ) -> str:  # type:ignore
     """
     Adds the pre-built <mods:recordInfo> element to the mods.
     Returns formatted XML string.
@@ -122,14 +125,14 @@ def update_local_mods_string( original_mods_xml: str, PREBUILT_RECORD_INFO_ELEME
     parser = etree.XMLParser( remove_blank_text=True )
     tree = etree.fromstring( original_mods_xml, parser=parser )
     ## add pre-built record-info element ----------------------------
-    root: etree.Element = tree
+    root: etree.Element = tree  # type:ignore
     root.append(etree.ElementTree(PREBUILT_RECORD_INFO_ELEMENT).getroot())
     ## convert back to string ---------------------------------------
     new_mods_xml = etree.tostring( 
         root, 
-        pretty_print=True, 
-        xml_declaration=False, 
-        encoding='UTF-8' ).decode('utf-8')
+        pretty_print=True,                      # type:ignore
+        xml_declaration=False,                  # type:ignore
+        encoding='UTF-8' ).decode('utf-8')      # type:ignore
     log.debug( f'new-mods, ``{new_mods_xml}``' )
     return new_mods_xml
 
@@ -148,7 +151,7 @@ def manage_update( pid_full_fpath: pathlib.Path ) -> None:
     ## load tracker -------------------------------------------------
     tracker_filepath: pathlib.Path = create_tracker( pid_full_fpath )
     ## build the record-info element --------------------------------
-    PREBUILT_RECORD_INFO_ELEMENT: etree.Element = create_record_info_element()
+    PREBUILT_RECORD_INFO_ELEMENT: etree.Element = create_record_info_element()  # type:ignore
     ## loop over pids -----------------------------------------------
     for pid in pids:
         assert type(pid) == str
