@@ -1,4 +1,4 @@
-import json, logging, os, pathlib
+import json, logging, os, pathlib, subprocess
 
 import httpx
 from lxml import etree
@@ -9,6 +9,7 @@ log = logging.getLogger( __name__ )
 
 ## constants --------------------------------------------------------
 MODS_URL_PATTERN = os.environ['U97__MODS_URL_PATTERN']
+POST_MODS_BINARY_PATH = os.environ['U97__POST_MODS_BINARY_PATH']
 
 
 ## helper functions -------------------------------------------------
@@ -135,6 +136,16 @@ def update_local_mods_string( original_mods_xml: str, PREBUILT_RECORD_INFO_ELEME
         encoding='UTF-8' ).decode('utf-8')      # type:ignore
     log.debug( f'new-mods, ``{new_mods_xml}``' )
     return new_mods_xml
+
+
+def save_mods( pid: str, updated_mods: str ) -> None:
+    """
+    Posts updated mods back to BDR.
+    """
+    cmd: list = [ POST_MODS_BINARY_PATH, '--mods_filepath', '/the/path.mods', '--bdr_pid', pid ]
+    binary_env: dict = os.environ.copy()  
+    result: subprocess.CompletedProcess = subprocess.run( cmd, env=binary_env, capture_output=True, text=True )
+    return
 
 
 ## manager function -------------------------------------------------

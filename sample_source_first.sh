@@ -18,6 +18,7 @@ fi
 ## `u97__` envars are used by this `bdr_update_97_org_items` code --------
 export U97__LOGLEVEL="DEBUG"
 export U97__MODS_URL_PATTERN="url-to/storage/{PID}/MODS/"  # should match server for `UM__API_ROOT_URL` envar
+export U97__POST_MODS_BINARY_PATH="/path/to/update_mods_py_binary"
 
 
 ## the `UM__` envars are used by the `update_mods_py_binary` -------------
