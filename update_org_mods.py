@@ -1,4 +1,4 @@
-import json, logging, os, pathlib, subprocess
+import json, logging, os, pathlib, subprocess, tempfile
 
 import httpx
 from lxml import etree
@@ -141,10 +141,26 @@ def update_local_mods_string( original_mods_xml: str, PREBUILT_RECORD_INFO_ELEME
 def save_mods( pid: str, updated_mods: str ) -> None:
     """
     Posts updated mods back to BDR.
+    - tempfile is used because the binary expects a filepath.
+    - delete=False is used because, as I understand, it'll be deleted when closed (not when with-scope ends),
+      ...which can cause issues when sending the file to subprocess.run()
     """
-    cmd: list = [ POST_MODS_BINARY_PATH, '--mods_filepath', '/the/path.mods', '--bdr_pid', pid ]
-    binary_env: dict = os.environ.copy()  
-    result: subprocess.CompletedProcess = subprocess.run( cmd, env=binary_env, capture_output=True, text=True )
+    with tempfile.NamedTemporaryFile( delete=False, suffix='.mods' ) as temp_file:
+        temp_file.write( updated_mods.encode('utf-8') )  
+        temp_file_path = temp_file.name  
+    try:
+        cmd: list = [ POST_MODS_BINARY_PATH, '--mods_filepath', temp_file_path, '--bdr_pid', pid ]
+        binary_env: dict = os.environ.copy()     
+        result: subprocess.CompletedProcess = subprocess.run( cmd, env=binary_env, capture_output=True, text=True )
+        log.debug( f'result.returncode, ``{result.returncode}``; result.stdout, ``{result.stdout}``; result.stderr, ``{result.stderr}``' )
+        if result.returncode != 0:
+            msg = f'error posting mods for pid, ``{pid}``'
+            log.debug( msg )
+            raise Exception( msg )
+        else:
+            log.debug( f'success posting mods for pid, ``{pid}``' )
+    finally:
+        os.remove( temp_file_path )
     return
 
 
