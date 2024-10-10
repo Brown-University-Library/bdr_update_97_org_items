@@ -2,8 +2,6 @@
 
 One-off script to update the MODS of 97 org-items in BDR.
 
-Under-construction...
-
 ---
 
 ## Usage
