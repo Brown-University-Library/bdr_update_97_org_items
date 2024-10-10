@@ -88,6 +88,7 @@ def update_tracker( pid: str, tracker_filepath: pathlib.Path, status: str ) -> N
     """
     Loads, updates, and re-saves tracker.
     """
+    assert status in [ 'done', 'error; see logs', 'element_already_exists' ]
     with open( tracker_filepath, 'w' ) as f:
         tracker: dict = json.loads( f.read() )
         tracker[ pid ] = status
@@ -114,7 +115,7 @@ def check_if_element_exists( pid: str, mods: str, tracker_filepath: pathlib.Path
     If it does already exist, updates tracker.
     """
     if '<mods:recordInfo>' in mods:
-        update_tracker( pid, tracker_filepath, 'already_exists' )
+        update_tracker( pid, tracker_filepath, 'element_already_exists' )
         return_val = True
     else:
         return_val = False
@@ -193,7 +194,7 @@ def manage_update( pid_full_fpath: pathlib.Path ) -> None:
     for pid in pids:
         assert type(pid) == str
         ## check if pid has been processed --------------------------
-        if check_if_pid_was_processed( pid, tracker_filepath ) == 'done':
+        if check_if_pid_was_processed( pid, tracker_filepath ) != 'not_done':  # the default-initialization-status
             continue
         ## get mods -------------------------------------------------
         mods: str = get_mods( pid )
