@@ -38,7 +38,7 @@ def load_pids( pid_full_fpath: pathlib.Path ) -> list:
 
 def create_tracker( pid_full_fpath: pathlib.Path ) -> pathlib.Path:
     """
-    Creates tracker.
+    Creates tracker if necessary.
     Assumes tracker is in same directory as pid-file.
     Returns tracker filepath.
     """
@@ -144,13 +144,14 @@ def update_local_mods_string( original_mods_xml: str, PREBUILT_RECORD_INFO_ELEME
     return new_mods_xml
 
 
-def save_mods( pid: str, updated_mods: str ) -> None:
+def save_mods( pid: str, updated_mods: str ) -> bool:
     """
     Posts updated mods back to BDR.
     - tempfile is used because the binary expects a filepath.
-    - delete=False is used because, as I understand, it'll be deleted when closed (not when with-scope ends),
-      ...which can cause issues when sending the file to subprocess.run()
+    - `delete=False` requires the temp-file to be deleted explicitly (not when with-scope ends),
+      ...otherwise there can be issues when sending the file to subprocess.run()
     """
+    success_check = False
     with tempfile.NamedTemporaryFile( delete=False, suffix='.mods' ) as temp_file:
         temp_file.write( updated_mods.encode('utf-8') )  
         temp_file_path = temp_file.name  
@@ -159,15 +160,18 @@ def save_mods( pid: str, updated_mods: str ) -> None:
         binary_env: dict = os.environ.copy()     
         result: subprocess.CompletedProcess = subprocess.run( cmd, env=binary_env, capture_output=True, text=True )
         log.debug( f'result.returncode, ``{result.returncode}``; result.stdout, ``{result.stdout}``; result.stderr, ``{result.stderr}``' )
-        if result.returncode != 0:
-            msg = f'error posting mods for pid, ``{pid}``'
-            log.debug( msg )
-            raise Exception( msg )
-        else:
+        if result.returncode == 0:
+            success_check = True
             log.debug( f'success posting mods for pid, ``{pid}``' )
+        else:
+            msg = f'error posting mods for pid, ``{pid}``'
+            log.error( msg )
+    except:
+        log.exception( 'problem updating mods; processing continues' )    
     finally:
         os.remove( temp_file_path )
-    return
+    log.debug( f'success_check, ``{success_check}``' )
+    return success_check
 
 
 ## manager function -------------------------------------------------
@@ -182,7 +186,7 @@ def manage_update( pid_full_fpath: pathlib.Path ) -> None:
     pids: list = load_pids( pid_full_fpath )
     # assert len( pids ) == 97
     ## load tracker -------------------------------------------------
-    tracker_filepath: pathlib.Path = create_tracker( pid_full_fpath )
+    tracker_filepath: pathlib.Path = create_tracker( pid_full_fpath )  # loads tracker if it already exists
     ## build the record-info element --------------------------------
     PREBUILT_RECORD_INFO_ELEMENT: etree.Element = create_record_info_element()  # type:ignore
     ## loop over pids -----------------------------------------------
@@ -199,7 +203,12 @@ def manage_update( pid_full_fpath: pathlib.Path ) -> None:
         ## update xml -----------------------------------------------
         updated_mods: str = update_local_mods_string( mods, PREBUILT_RECORD_INFO_ELEMENT )
         ## save back to BDR -----------------------------------------
-        save_mods( pid, updated_mods )
+        success_check: bool = save_mods( pid, updated_mods )
+        ## update tracker -------------------------------------------
+        if success_check:
+            update_tracker( pid, tracker_filepath, 'done' )
+        else:
+            update_tracker( pid, tracker_filepath, 'error; see logs' )
     return
 
 
