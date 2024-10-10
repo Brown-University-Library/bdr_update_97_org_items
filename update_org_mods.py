@@ -43,7 +43,8 @@ def create_tracker( pid_full_fpath: pathlib.Path ) -> pathlib.Path:
     Returns tracker filepath.
     """
     tracker_full_fpath = pid_full_fpath.parent.joinpath( 'tracker.json' )
-    if tracker_full_fpath.exists():
+    # if tracker_full_fpath.exists():
+    if tracker_full_fpath.exists() and tracker_full_fpath.stat().st_size > 0:  # latter condition handles empty file
         pass
     else:
         with open( tracker_full_fpath, 'w' ) as f:
