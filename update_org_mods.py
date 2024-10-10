@@ -1,4 +1,10 @@
-import json, logging, os, pathlib
+"""
+Working code to update 97 org-level items in BDR.
+- See README.md for usage (call cli_start.py first).
+- manage_update(), at bottom, is the main manager function
+"""
+
+import json, logging, os, pathlib, subprocess, tempfile
 
 import httpx
 from lxml import etree
@@ -9,6 +15,7 @@ log = logging.getLogger( __name__ )
 
 ## constants --------------------------------------------------------
 MODS_URL_PATTERN = os.environ['U97__MODS_URL_PATTERN']
+POST_MODS_BINARY_PATH = os.environ['U97__POST_MODS_BINARY_PATH']
 
 
 ## helper functions -------------------------------------------------
@@ -31,12 +38,13 @@ def load_pids( pid_full_fpath: pathlib.Path ) -> list:
 
 def create_tracker( pid_full_fpath: pathlib.Path ) -> pathlib.Path:
     """
-    Creates tracker.
+    Creates tracker if necessary.
     Assumes tracker is in same directory as pid-file.
     Returns tracker filepath.
     """
     tracker_full_fpath = pid_full_fpath.parent.joinpath( 'tracker.json' )
-    if tracker_full_fpath.exists():
+    # if tracker_full_fpath.exists():
+    if tracker_full_fpath.exists() and tracker_full_fpath.stat().st_size > 0:  # latter condition handles empty file
         pass
     else:
         with open( tracker_full_fpath, 'w' ) as f:
@@ -77,15 +85,20 @@ def check_if_pid_was_processed( pid: str, tracker_filepath: pathlib.Path ) -> st
     return status
 
 
-def update_tracker( pid: str, tracker_filepath: pathlib.Path, status: str ) -> None:
+def update_tracker(pid: str, tracker_filepath: pathlib.Path, status: str) -> None:
     """
     Loads, updates, and re-saves tracker.
     """
-    with open( tracker_filepath, 'w' ) as f:
-        tracker: dict = json.loads( f.read() )
-        tracker[ pid ] = status
-        f.write( json.dumps( tracker, sort_keys=True, indent=2 ) )
-    log.debug( f'updated-tracker for pid, ``{pid}`` with status, ``{status}``' )
+    assert status in ['done', 'error; see logs', 'element_already_exists']
+    ## read existing tracker data -----------------------------------
+    with open(tracker_filepath, 'r') as f:
+        tracker: dict = json.load(f)
+    ## update tracker -----------------------------------------------
+    tracker[pid] = status
+    ## write updated tracker back to file -
+    with open(tracker_filepath, 'w') as f:
+        f.write(json.dumps(tracker, sort_keys=True, indent=2))
+    log.debug(f'updated-tracker for pid, ``{pid}`` with status, ``{status}``')
     return
 
 
@@ -107,7 +120,7 @@ def check_if_element_exists( pid: str, mods: str, tracker_filepath: pathlib.Path
     If it does already exist, updates tracker.
     """
     if '<mods:recordInfo>' in mods:
-        update_tracker( pid, tracker_filepath, 'already_exists' )
+        update_tracker( pid, tracker_filepath, 'element_already_exists' )
         return_val = True
     else:
         return_val = False
@@ -137,6 +150,36 @@ def update_local_mods_string( original_mods_xml: str, PREBUILT_RECORD_INFO_ELEME
     return new_mods_xml
 
 
+def save_mods( pid: str, updated_mods: str ) -> bool:
+    """
+    Posts updated mods back to BDR.
+    - tempfile is used because the binary expects a filepath.
+    - `delete=False` requires the temp-file to be deleted explicitly (not when with-scope ends),
+      ...otherwise there can be issues when sending the file to subprocess.run()
+    """
+    success_check = False
+    with tempfile.NamedTemporaryFile( delete=False, suffix='.mods' ) as temp_file:
+        temp_file.write( updated_mods.encode('utf-8') )  
+        temp_file_path = temp_file.name  
+    try:
+        cmd: list = [ POST_MODS_BINARY_PATH, '--mods_filepath', temp_file_path, '--bdr_pid', pid ]
+        binary_env: dict = os.environ.copy()     
+        result: subprocess.CompletedProcess = subprocess.run( cmd, env=binary_env, capture_output=True, text=True )
+        log.debug( f'result.returncode, ``{result.returncode}``; result.stdout, ``{result.stdout}``; result.stderr, ``{result.stderr}``' )
+        if result.returncode == 0:
+            success_check = True
+            log.debug( f'success posting mods for pid, ``{pid}``' )
+        else:
+            msg = f'error posting mods for pid, ``{pid}``'
+            log.error( msg )
+    except:
+        log.exception( 'problem updating mods; processing continues' )    
+    finally:
+        os.remove( temp_file_path )
+    log.debug( f'success_check, ``{success_check}``' )
+    return success_check
+
+
 ## manager function -------------------------------------------------
 
 
@@ -149,14 +192,14 @@ def manage_update( pid_full_fpath: pathlib.Path ) -> None:
     pids: list = load_pids( pid_full_fpath )
     # assert len( pids ) == 97
     ## load tracker -------------------------------------------------
-    tracker_filepath: pathlib.Path = create_tracker( pid_full_fpath )
+    tracker_filepath: pathlib.Path = create_tracker( pid_full_fpath )  # loads tracker if it already exists
     ## build the record-info element --------------------------------
     PREBUILT_RECORD_INFO_ELEMENT: etree.Element = create_record_info_element()  # type:ignore
     ## loop over pids -----------------------------------------------
     for pid in pids:
         assert type(pid) == str
         ## check if pid has been processed --------------------------
-        if check_if_pid_was_processed( pid, tracker_filepath ) == 'done':
+        if check_if_pid_was_processed( pid, tracker_filepath ) != 'not_done':  # the default-initialization-status
             continue
         ## get mods -------------------------------------------------
         mods: str = get_mods( pid )
@@ -166,7 +209,12 @@ def manage_update( pid_full_fpath: pathlib.Path ) -> None:
         ## update xml -----------------------------------------------
         updated_mods: str = update_local_mods_string( mods, PREBUILT_RECORD_INFO_ELEMENT )
         ## save back to BDR -----------------------------------------
-        save_mods( pid, updated_mods )
+        success_check: bool = save_mods( pid, updated_mods )
+        ## update tracker -------------------------------------------
+        if success_check:
+            update_tracker( pid, tracker_filepath, 'done' )
+        else:
+            update_tracker( pid, tracker_filepath, 'error; see logs' )
     return
 
 

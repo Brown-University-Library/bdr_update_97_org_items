@@ -2,11 +2,7 @@
 
 One-off script to update the MODS of 97 org-items in BDR.
 
-Under-construction... next...
-
-- add dotenv to allow for testing against dev or prod.
-
-- integrate former work updating mods with a pid and a path to a file.
+Under-construction...
 
 ---
 
