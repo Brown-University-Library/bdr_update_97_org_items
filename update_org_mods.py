@@ -1,3 +1,9 @@
+"""
+Working code to update 97 org-level items in BDR.
+- See README.md for usage (call cli_start.py first).
+- manage_update(), at bottom, is the main manager function
+"""
+
 import json, logging, os, pathlib, subprocess, tempfile
 
 import httpx
