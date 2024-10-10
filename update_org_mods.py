@@ -84,16 +84,20 @@ def check_if_pid_was_processed( pid: str, tracker_filepath: pathlib.Path ) -> st
     return status
 
 
-def update_tracker( pid: str, tracker_filepath: pathlib.Path, status: str ) -> None:
+def update_tracker(pid: str, tracker_filepath: pathlib.Path, status: str) -> None:
     """
     Loads, updates, and re-saves tracker.
     """
-    assert status in [ 'done', 'error; see logs', 'element_already_exists' ]
-    with open( tracker_filepath, 'w' ) as f:
-        tracker: dict = json.loads( f.read() )
-        tracker[ pid ] = status
-        f.write( json.dumps( tracker, sort_keys=True, indent=2 ) )
-    log.debug( f'updated-tracker for pid, ``{pid}`` with status, ``{status}``' )
+    assert status in ['done', 'error; see logs', 'element_already_exists']
+    ## read existing tracker data -----------------------------------
+    with open(tracker_filepath, 'r') as f:
+        tracker: dict = json.load(f)
+    ## update tracker -----------------------------------------------
+    tracker[pid] = status
+    ## write updated tracker back to file -
+    with open(tracker_filepath, 'w') as f:
+        f.write(json.dumps(tracker, sort_keys=True, indent=2))
+    log.debug(f'updated-tracker for pid, ``{pid}`` with status, ``{status}``')
     return
 
 
